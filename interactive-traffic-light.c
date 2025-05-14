@@ -71,7 +71,6 @@ void button_interrupt_handler(uint gpio, uint32_t events)
     if (events & GPIO_IRQ_EDGE_FALL)
     {
         printf("Pedestrian button!\n");
-        pedestrian_alert = true;
     }
 }
 
