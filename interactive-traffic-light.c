@@ -143,7 +143,7 @@ int main()
     printf("Traffic Light System\n");
 
     gpio_set_irq_enabled_with_callback(BUTTON, GPIO_IRQ_EDGE_FALL, true, &button_interrupt_handler);
-    add_alarm_in_ms(2000, turn_on_red_callback, NULL, false);
+    add_alarm_in_ms(1000, state_controller, NULL, true);
 
     while (true)
     {
