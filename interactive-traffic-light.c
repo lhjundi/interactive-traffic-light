@@ -52,14 +52,17 @@ void change_state(){
     switch (current.state)
     {
         case RED:
+            turn_on_green_signal();
             current.state = GREEN;
             current.duration = 10000;
             break;
         case GREEN:
+            turn_on_yellow_signal();
             current.state = YELLOW;
             current.duration = 3000;
             break;
         case YELLOW:
+            turn_on_red_signal();
             current.state = RED;
             current.duration = 10000;
             break;
