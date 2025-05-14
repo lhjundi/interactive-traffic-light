@@ -7,6 +7,21 @@
 #define RED_LED 13
 #define BUTTON 5
 
+typedef enum{
+    RED,
+    YELLOW,
+    GREEN
+} traffic_light_state;
+
+struct light_state
+{
+    traffic_light_state state;
+    uint32_t duration;
+};
+
+volatile struct light_state current = {RED, 10000};
+
+// Function prototypes
 void turn_on_red_signal();
 void turn_on_yellow_signal();
 void turn_on_green_signal();
@@ -17,13 +32,46 @@ int64_t turn_on_green_callback(alarm_id_t id, void *user_data);
 int64_t turn_on_red_callback(alarm_id_t id, void *user_data);
 void setup();
 void button_interrupt_handler(uint gpio, uint32_t events);
+void change_state();
+int64_t state_controller();
+int64_t is_time_to_change();
+
+int64_t state_controller(){
+    current.duration -= 1000;
+    if(is_time_to_change())
+        change_state();
+}
+
+int64_t is_time_to_change()
+{
+    if (current.duration <= 0) return 1;
+    return 0;
+}
+
+void change_state(){
+    switch (current.state)
+    {
+        case RED:
+            current.state = GREEN;
+            current.duration = 10000;
+            break;
+        case GREEN:
+            current.state = YELLOW;
+            current.duration = 3000;
+            break;
+        case YELLOW:
+            current.state = RED;
+            current.duration = 10000;
+            break;
+    }
+}
 
 void button_interrupt_handler(uint gpio, uint32_t events)
 {
     if (events & GPIO_IRQ_EDGE_FALL)
     {
         printf("Pedestrian button!\n");
-        turn_on_yellow_signal();
+        pedestrian_alert = true;
     }
 }
 
