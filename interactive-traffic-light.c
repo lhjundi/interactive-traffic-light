@@ -30,15 +30,15 @@ void turn_on_yellow_signal();
 void setup();
 void button_interrupt_handler(uint gpio, uint32_t events);
 void change_state();
-int64_t state_controller();
+bool state_controller();
 bool is_time_to_change();
 
-int64_t state_controller(){
+bool state_controller(){
     printf("Duration: %d seconds\n", current.duration/1000);
     current.duration -= 1000;
     if(is_time_to_change())
         change_state();
-    return 1000000;
+    return true;
 }
 
 bool is_time_to_change()
@@ -123,9 +123,12 @@ int main()
 {
     setup();
 
-    gpio_set_irq_enabled_with_callback(BUTTON, GPIO_IRQ_EDGE_FALL, true, &button_interrupt_handler);
-    add_alarm_in_ms(1000, state_controller, NULL, true);
+    struct repeating_timer timer;
 
+    add_repeating_timer_ms(-1000, state_controller, NULL, &timer);
+    gpio_set_irq_enabled_with_callback(BUTTON, GPIO_IRQ_EDGE_FALL, true, &button_interrupt_handler);
+    // add_alarm_in_ms(1000, state_controller, NULL, true);
+    
     while (true)
     {
         tight_loop_contents();
