@@ -27,25 +27,23 @@ void turn_on_yellow_signal();
 void turn_on_green_signal();
 void turn_on_red_signal();
 void turn_on_yellow_signal();
-int64_t turn_on_yellow_callback(alarm_id_t id, void *user_data);
-int64_t turn_on_green_callback(alarm_id_t id, void *user_data);
-int64_t turn_on_red_callback(alarm_id_t id, void *user_data);
 void setup();
 void button_interrupt_handler(uint gpio, uint32_t events);
 void change_state();
 int64_t state_controller();
-int64_t is_time_to_change();
+bool is_time_to_change();
 
 int64_t state_controller(){
     current.duration -= 1000;
     if(is_time_to_change())
         change_state();
+    return 1000000;
 }
 
-int64_t is_time_to_change()
+bool is_time_to_change()
 {
-    if (current.duration <= 0) return 1;
-    return 0;
+    if (current.duration <= 0) return true;
+    return false;
 }
 
 void change_state(){
@@ -73,7 +71,9 @@ void button_interrupt_handler(uint gpio, uint32_t events)
 {
     if (events & GPIO_IRQ_EDGE_FALL)
     {
-        printf("Pedestrian button!\n");
+        printf("Pedestrian button activated!\n");
+        current.duration = 1000;
+        current.state = GREEN;
     }
 }
 
@@ -98,27 +98,6 @@ void turn_on_yellow_signal()
     printf("Signal: Yellow!\n");
 }
 
-int64_t turn_on_yellow_callback(alarm_id_t id, void *user_data)
-{
-    turn_on_yellow_signal();
-    add_alarm_in_ms(3000, turn_on_red_callback, NULL, false);
-    return 0;
-}
-
-int64_t turn_on_green_callback(alarm_id_t id, void *user_data)
-{
-    turn_on_green_signal();
-    add_alarm_in_ms(10000, turn_on_yellow_callback, NULL, false);
-    return 0;
-}
-
-int64_t turn_on_red_callback(alarm_id_t id, void *user_data)
-{
-    turn_on_red_signal();
-    add_alarm_in_ms(10000, turn_on_green_callback, NULL, false);
-    return 0;
-}
-
 void setup()
 {
     stdio_init_all();
@@ -134,13 +113,14 @@ void setup()
     gpio_init(BUTTON);
     gpio_set_dir(BUTTON, GPIO_IN);
     gpio_pull_up(BUTTON);
+    sleep_ms(2000);
+    printf("Traffic Light System\n");
+    turn_on_red_signal();
 }
 
 int main()
 {
     setup();
-    
-    printf("Traffic Light System\n");
 
     gpio_set_irq_enabled_with_callback(BUTTON, GPIO_IRQ_EDGE_FALL, true, &button_interrupt_handler);
     add_alarm_in_ms(1000, state_controller, NULL, true);
