@@ -34,6 +34,7 @@ int64_t state_controller();
 bool is_time_to_change();
 
 int64_t state_controller(){
+    printf("Duration: %d seconds\n", current.duration/1000);
     current.duration -= 1000;
     if(is_time_to_change())
         change_state();
