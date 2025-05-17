@@ -89,8 +89,40 @@ bool state_controller();
 bool is_time_to_change();
 void init_display();
 void update_display();
+char *get_state_string();
 
-// Implementações das funções do display OLED
+int some_button_pressed();
+
+/**
+ * @brief Returns a string representing the current traffic light state or pedestrian instruction.
+ *
+ * The returned string depends on button presses and the current traffic light state:
+ * - If either button A or B is pressed and the light is RED, returns "Walk!".
+ * - If either button A or B is pressed but the light is not RED, returns "Wait".
+ * - Otherwise, returns the current traffic light color as a string: "RED", "YELLOW", or "GREEN".
+ *
+ * @return Pointer to a string literal representing the current state or pedestrian instruction.
+ */
+char* get_state_string(){
+    if ((some_button_pressed()) && current.state == RED)
+        return "Walk!";
+    if (some_button_pressed()) return "Wait";
+    if (current.state == RED) return "RED";
+    if (current.state == YELLOW) return "YELLOW";
+    if (current.state == GREEN) return "GREEN";
+}
+
+/**
+ * @brief Checks if any pedestrian button is pressed.
+ *
+ * Returns a non-zero value if either button A or button B is currently pressed.
+ *
+ * @return int Non-zero if any button is pressed; zero otherwise.
+ */
+int some_button_pressed()
+{
+    return button_A_pressed || button_B_pressed;
+}
 
 /**
  * @brief Initializes the OLED display and I2C interface.
@@ -136,15 +168,15 @@ void update_display()
     snprintf(temp_str, sizeof(temp_str), "Traffic Light System");
     ssd1306_draw_string(0, 0, temp_str, true);
 
-    snprintf(state_str, sizeof(state_str), "Current State: %s", current.state == RED ? "RED" : (current.state == YELLOW ? "YELLOW" : "GREEN"));
+    snprintf(state_str, sizeof(state_str), "Current State: %s", get_state_string());
     ssd1306_draw_string(0, 16, state_str, true);
 
-    if (current.state == RED && current.duration <= 5000 && (button_A_pressed || button_B_pressed))
+    if (current.state == RED && current.duration <= 5000 && (some_button_pressed()))
     {
         snprintf(countdown_str, sizeof(countdown_str), "Countdown: %d s", current.duration / 1000);
         ssd1306_draw_string(0, 32, countdown_str, true);
     }
-    else if ((button_A_pressed || button_B_pressed))
+    else if ((some_button_pressed()))
     {
         snprintf(countdown_str, sizeof(countdown_str), "Button Pressed!");
         ssd1306_draw_string(0, 32, countdown_str, true);
@@ -230,10 +262,10 @@ bool state_controller()
 {
     current.duration -= 1000;
     update_display();
-    if (current.state == RED && current.duration <= 5000 && (button_A_pressed || button_B_pressed))
+    if (current.state == RED && current.duration <= 5000 && (some_button_pressed()))
         printf("Duration: %d seconds\n", current.duration / 1000);
 
-    if ((button_A_pressed || button_B_pressed) && current.state == RED && current.duration == 5000)
+    if ((some_button_pressed()) && current.state == RED && current.duration == 5000)
     {
         beep(BUZZER, 5000);
     }
