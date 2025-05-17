@@ -4,6 +4,8 @@
 #include "hardware/clocks.h"
 #include "hardware/timer.h"
 #include "hardware/gpio.h"
+#include "hardware/i2c.h"
+#include "ssd1306.h"
 
 #define GREEN_LED 11
 #define RED_LED 13
@@ -11,6 +13,11 @@
 #define BUTTON_B 6
 #define BUZZER 21
 #define BUZZER_FREQ 100
+
+// Definições para o display OLED via I2C
+#define I2C_PORT i2c1 // Porta I2C utilizada para comunicação
+#define I2C_SDA 14    // Pino de dados SDA do I2C
+#define I2C_SCL 15    // Pino de clock SCL do I2C
 
 typedef enum
 {
@@ -44,6 +51,66 @@ int64_t beep_stop_callback(alarm_id_t id, void *user_data);
 bool state_controller();
 bool is_time_to_change();
 
+// Funções do display OLED
+void init_display();   // Inicializa o display OLED
+void update_display(); // Atualiza as informações no display
+
+// Implementações das funções do display OLED
+
+/**
+ * Inicializa o display OLED via I2C
+ * Configura a comunicação I2C e prepara o display para uso
+ */
+void init_display()
+{
+    // Inicializa o I2C com frequência de 400kHz
+    i2c_init(I2C_PORT, 400000);
+    gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);
+    gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);
+    gpio_pull_up(I2C_SDA);
+    gpio_pull_up(I2C_SCL);
+
+    // Inicializa o display OLED
+    ssd1306_init(I2C_PORT);
+    ssd1306_clear();
+    ssd1306_update(I2C_PORT);
+}
+
+void update_display()
+{
+    char temp_str[32];
+    char state_str[32];
+    char countdown_str[32];
+
+    ssd1306_clear(); // Limpa o display antes de atualizar
+
+    // Exibe a temperatura
+    snprintf(temp_str, sizeof(temp_str), "Traffic Light System");
+    ssd1306_draw_string(0, 0, temp_str, true);
+    
+    // Exibe a temperatura
+    snprintf(state_str, sizeof(state_str), "Current State: %s", current.state == RED ? "RED" : (current.state == YELLOW ? "YELLOW" : "GREEN"));
+    ssd1306_draw_string(0, 16, state_str, true);
+    
+    if(current.state == RED && current.duration <= 5000 && (button_A_pressed || button_B_pressed))
+    {
+        snprintf(countdown_str, sizeof(countdown_str), "Countdown: %d s", current.duration / 1000);
+        ssd1306_draw_string(0, 32, countdown_str, true);
+    }
+    else if((button_A_pressed || button_B_pressed)){
+        snprintf(countdown_str, sizeof(countdown_str), "Button Pressed!");
+        ssd1306_draw_string(0, 32, countdown_str, true);
+    }
+    else
+    {
+        snprintf(countdown_str, sizeof(countdown_str), "Waiting for button...");
+        ssd1306_draw_string(0, 32, countdown_str, true);
+    }
+
+    // Envia os dados para o display
+    ssd1306_update(I2C_PORT);
+}
+
 int64_t beep_stop_callback(alarm_id_t id, void *user_data)
 {
     uint pin = (uintptr_t)user_data;
@@ -73,6 +140,7 @@ void pwm_init_buzzer(uint pin)
 bool state_controller()
 {
     current.duration -= 1000;
+    update_display();
     if (current.state == RED && current.duration <= 5000 && (button_A_pressed || button_B_pressed))
         printf("Duration: %d seconds\n", current.duration / 1000);
 
@@ -177,6 +245,7 @@ void setup()
 int main()
 {
     setup();
+    init_display();
 
     struct repeating_timer timer;
     struct repeating_timer buzzer_timer;
