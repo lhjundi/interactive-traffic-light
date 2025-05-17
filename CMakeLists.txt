@@ -48,7 +48,9 @@ pico_enable_stdio_usb(interactive-traffic-light 1)
 target_link_libraries(interactive-traffic-light
         pico_stdlib
         hardware_timer
-        hardware_gpio)
+        hardware_gpio
+        hardware_pwm
+        hardware_clocks)
 
 # Add the standard include files to the build
 target_include_directories(interactive-traffic-light PRIVATE

@@ -1,11 +1,16 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
+#include "hardware/pwm.h"
+#include "hardware/clocks.h"
 #include "hardware/timer.h"
 #include "hardware/gpio.h"
 
 #define GREEN_LED 11
 #define RED_LED 13
-#define BUTTON 5
+#define BUTTON_A 5
+#define BUTTON_B 6
+#define BUZZER 21
+#define BUZZER_FREQ 100
 
 typedef enum{
     RED,
@@ -20,6 +25,7 @@ struct light_state
 };
 
 volatile struct light_state current = {RED, 10000};
+volatile bool button_pressed = false;
 
 // Function prototypes
 void turn_on_red_signal();
@@ -28,16 +34,51 @@ void turn_on_green_signal();
 void turn_on_red_signal();
 void turn_on_yellow_signal();
 void setup();
-void button_interrupt_handler(uint gpio, uint32_t events);
+void BUTTON_A_interrupt_handler(uint gpio, uint32_t events);
 void change_state();
-int64_t state_controller();
+void pwm_init_buzzer(uint pin);
+void beep(uint pin, uint32_t duration_ms);
+int64_t beep_stop_callback(alarm_id_t id, void *user_data);
+bool state_controller();
 bool is_time_to_change();
 
-int64_t state_controller(){
+int64_t beep_stop_callback(alarm_id_t id, void *user_data) {
+    uint pin = (uintptr_t)user_data;
+    pwm_set_gpio_level(pin, 0);
+    return 0;
+}
+
+void beep(uint pin, uint32_t duration_ms) {
+    // Liga o buzzer com duty cycle de 50%
+    pwm_set_gpio_level(pin, 2048);
+
+    // Passa o pino como ponteiro para desligar depois
+    add_alarm_in_ms(duration_ms, beep_stop_callback, (void*)(uintptr_t)pin, false);
+}
+
+
+void pwm_init_buzzer(uint pin)
+{
+    gpio_set_function(pin, GPIO_FUNC_PWM);
+    uint slice_num = pwm_gpio_to_slice_num(pin);
+    pwm_config config = pwm_get_default_config();
+    pwm_config_set_clkdiv(&config, clock_get_hz(clk_sys) / (BUZZER_FREQ * 4096));
+    pwm_init(slice_num, &config, true);
+    pwm_set_gpio_level(pin, 0);
+}
+
+bool state_controller(){
+    printf("Duration: %d seconds\n", current.duration/1000);
     current.duration -= 1000;
+
+    if (button_pressed && current.state == RED && current.duration == 5000)
+    {
+        beep(BUZZER, 5000);
+        button_pressed = false;
+    }
     if(is_time_to_change())
         change_state();
-    return 1000000;
+    return true;
 }
 
 bool is_time_to_change()
@@ -67,13 +108,14 @@ void change_state(){
     }
 }
 
-void button_interrupt_handler(uint gpio, uint32_t events)
+void BUTTON_A_interrupt_handler(uint gpio, uint32_t events)
 {
     if (events & GPIO_IRQ_EDGE_FALL)
     {
-        printf("Pedestrian button activated!\n");
+        printf("Pedestrian BUTTON_A activated!\n");
         current.duration = 1000;
         current.state = GREEN;
+        button_pressed = true;
     }
 }
 
@@ -110,9 +152,10 @@ void setup()
     gpio_set_dir(RED_LED, GPIO_OUT);
     gpio_put(RED_LED, 0);
 
-    gpio_init(BUTTON);
-    gpio_set_dir(BUTTON, GPIO_IN);
-    gpio_pull_up(BUTTON);
+    gpio_init(BUTTON_A);
+    gpio_set_dir(BUTTON_A, GPIO_IN);
+    gpio_pull_up(BUTTON_A);
+    pwm_init_buzzer(BUZZER);
     sleep_ms(2000);
     printf("Traffic Light System\n");
     turn_on_red_signal();
@@ -122,9 +165,13 @@ int main()
 {
     setup();
 
-    gpio_set_irq_enabled_with_callback(BUTTON, GPIO_IRQ_EDGE_FALL, true, &button_interrupt_handler);
-    add_alarm_in_ms(1000, state_controller, NULL, true);
+    struct repeating_timer timer;
+    struct repeating_timer buzzer_timer;
 
+    add_repeating_timer_ms(-1000, state_controller, NULL, &timer);
+    gpio_set_irq_enabled_with_callback(BUTTON_A, GPIO_IRQ_EDGE_FALL, true, &BUTTON_A_interrupt_handler);
+    // add_alarm_in_ms(1000, state_controller, NULL, true);
+    
     while (true)
     {
         tight_loop_contents();
